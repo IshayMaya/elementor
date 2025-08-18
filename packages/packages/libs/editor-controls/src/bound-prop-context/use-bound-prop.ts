@@ -21,6 +21,7 @@ type UseBoundProp< TValue extends PropValue > = {
 	restoreValue: () => void;
 	isDisabled?: ( propType: PropType ) => boolean | undefined;
 	disabled?: boolean;
+	setIsValid: ( isValid: boolean ) => void;
 };
 
 export function useBoundProp< T extends PropValue = PropValue, P extends PropType = PropType >(): PropKeyContextValue<
@@ -37,7 +38,7 @@ export function useBoundProp< TKey extends string, TValue extends PropValue >(
 ) {
 	const propKeyContext = usePropKeyContext();
 
-	const { isValid, validate, restoreValue } = useValidation( propKeyContext.propType );
+	const { isValid, validate, restoreValue, setIsValid } = useValidation( propKeyContext.propType );
 
 	const disabled = propKeyContext.isDisabled?.( propKeyContext.propType );
 
@@ -46,8 +47,13 @@ export function useBoundProp< TKey extends string, TValue extends PropValue >(
 		return { ...propKeyContext, disabled } as PropKeyContextValue< PropValue, PropType >;
 	}
 
-	function setValue( value: TValue | null, options: CreateOptions, meta: { bind?: PropKey } ) {
-		if ( ! validate( value ) ) {
+	function setValue(
+		value: TValue | null,
+		options: CreateOptions,
+		meta: { bind?: PropKey; validation?: ( value: TValue ) => boolean }
+	) {
+		console.log( 'Setting value:', value );
+		if ( ! validate( value, meta?.validation ) ) {
 			return;
 		}
 
@@ -71,6 +77,7 @@ export function useBoundProp< TKey extends string, TValue extends PropValue >(
 		restoreValue,
 		placeholder,
 		disabled,
+		setIsValid,
 	};
 }
 
@@ -79,19 +86,27 @@ const useValidation = ( propType: PropType ) => {
 
 	// If the value does not pass the prop type validation, set the isValid state to false.
 	// This will prevent the value from being set in the model, and its fallback will be used instead.
-	const validate = ( value: PropValue | null ) => {
+	const validate = ( value: PropValue | null, validation?: ( value: PropValue ) => boolean ) => {
 		let valid = true;
 
 		if ( propType.settings.required && value === null ) {
 			valid = false;
 		}
 
+		if ( validation ) {
+			valid = validation( value );
+		}
+
+		console.log( 'validate:', { value, valid, validation } );
+
 		setIsValid( valid );
 
 		return valid;
 	};
 
-	const restoreValue = () => setIsValid( true );
+	const restoreValue = () => {
+		setIsValid( true );
+	};
 
 	return {
 		isValid,

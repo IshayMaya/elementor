@@ -1,6 +1,7 @@
 import * as React from 'react';
+import { useRef, useState } from 'react';
 import { numberPropTypeUtil } from '@elementor/editor-props';
-import { InputAdornment, TextField } from '@elementor/ui';
+import { InputAdornment, TextField, type TextFieldProps } from '@elementor/ui';
 
 import { useBoundProp } from '../bound-prop-context';
 import ControlActions from '../control-actions/control-actions';
@@ -9,7 +10,7 @@ import { createControl } from '../create-control';
 const isEmptyOrNaN = ( value?: string | number | null ) =>
 	value === null || value === undefined || value === '' || Number.isNaN( Number( value ) );
 
-const RESTRICTED_INPUT_KEYS = [ 'e', 'E', '+', '-' ];
+const RESTRICTED_INPUT_KEYS = [ 'e', 'E', '+' ];
 
 export const NumberControl = createControl(
 	( {
@@ -27,10 +28,23 @@ export const NumberControl = createControl(
 		shouldForceInt?: boolean;
 		startIcon?: React.ReactNode;
 	} ) => {
-		const { value, setValue, placeholder, disabled } = useBoundProp( numberPropTypeUtil );
+		const { value, setValue, placeholder, disabled, restoreValue, setIsValid } = useBoundProp( numberPropTypeUtil );
 
 		const handleChange = ( event: React.ChangeEvent< HTMLInputElement > ) => {
 			const eventValue: string = event.target.value;
+
+			const { valid } = event.target.validity;
+
+			const formattedValue = shouldForceInt ? +parseInt( eventValue ) : Number( eventValue );
+
+			if ( ! valid ) {
+				// setIsValid( false );
+				setValue( Math.min( Math.max( formattedValue, min ), max ), undefined, {
+					validation: () => valid,
+				} );
+
+				return;
+			}
 
 			if ( isEmptyOrNaN( eventValue ) ) {
 				setValue( null );
@@ -38,20 +52,18 @@ export const NumberControl = createControl(
 				return;
 			}
 
-			const formattedValue = shouldForceInt ? +parseInt( eventValue ) : Number( eventValue );
-
 			setValue( Math.min( Math.max( formattedValue, min ), max ) );
 		};
 
 		return (
 			<ControlActions>
-				<TextField
+				<NumberInput
 					size="tiny"
 					type="number"
 					fullWidth
 					disabled={ disabled }
 					value={ isEmptyOrNaN( value ) ? '' : value }
-					onChange={ handleChange }
+					onInput={ handleChange }
 					placeholder={ labelPlaceholder ?? ( isEmptyOrNaN( placeholder ) ? '' : String( placeholder ) ) }
 					inputProps={ { step } }
 					InputProps={ {
@@ -61,13 +73,35 @@ export const NumberControl = createControl(
 							</InputAdornment>
 						) : undefined,
 					} }
-					onKeyDown={ ( event: KeyboardEvent ) => {
+					onKeyDown={ ( event ) => {
 						if ( RESTRICTED_INPUT_KEYS.includes( event.key ) ) {
 							event.preventDefault();
 						}
 					} }
+					onBlur={ restoreValue }
 				/>
 			</ControlActions>
 		);
 	}
 );
+
+function NumberInput( props: TextFieldProps ) {
+	const [ key, setKey ] = useState< string | null >( null );
+
+	return (
+		<TextField
+			{ ...props }
+			key={ key }
+			onBlur={ ( e ) => {
+				const { valid } = e.target.validity;
+				console.log( 'isValid:', { isValid: valid } );
+
+				if ( ! valid ) {
+					setKey( String( Math.random() ) );
+				}
+
+				props.onBlur?.( e );
+			} }
+		/>
+	);
+}
