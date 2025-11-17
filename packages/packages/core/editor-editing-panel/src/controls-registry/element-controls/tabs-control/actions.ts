@@ -1,5 +1,3 @@
-import { elementType } from 'prop-types';
-import { createPropsResolver } from '@elementor/editor-canvas';
 import { type ItemActionPayload } from '@elementor/editor-controls';
 import {
 	createElements,
@@ -85,16 +83,14 @@ export const removeItem = ( {
 	items,
 	tabContentAreaId,
 	tabsContainerId,
-	removedIndex,
 }: {
 	items: ItemActionPayload< TabItem >;
 	tabContentAreaId: string;
 	tabsContainerId: string;
-	removedIndex: number;
 } ) => {
 	// TODO: Resolve the default active tab using the props resolver.
 	const defaultActiveTab = getElementSetting< NumberPropValue >( tabsContainerId, 'default-active-tab' );
-
+	const isDefaultActiveTab = items.some( ( { index } ) => index === defaultActiveTab?.value );
 	removeElements( {
 		title: __( 'Tabs', 'elementor' ),
 		elementIds: items.flatMap( ( { item, index } ) => {
@@ -109,7 +105,7 @@ export const removeItem = ( {
 			return [ tabId, tabContentId ];
 		} ),
 		onRemoveElements: () => {
-			if ( removedIndex === defaultActiveTab?.value ) {
+			if ( isDefaultActiveTab ) {
 				updateElementSettings( {
 					id: tabsContainerId,
 					props: { 'default-active-tab': numberPropTypeUtil.create( 0 ) },
@@ -118,7 +114,7 @@ export const removeItem = ( {
 			}
 		},
 		onRestoreElements: () => {
-			if ( removedIndex === defaultActiveTab?.value ) {
+			if ( isDefaultActiveTab ) {
 				updateElementSettings( {
 					id: tabsContainerId,
 					props: { 'default-active-tab': defaultActiveTab },

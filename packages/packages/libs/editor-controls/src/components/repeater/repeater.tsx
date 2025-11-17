@@ -39,12 +39,11 @@ type RepeaterItemContentProps< T > = {
 
 type RepeaterItemContent< T > = React.ComponentType< RepeaterItemContentProps< T > >;
 
-export type ItemActionPayload< T > = { index: number; item: T };
-export type ItemsActionPayload< T > = Array< ItemActionPayload<T> >;
+export type ItemActionPayload< T > = Array< { index: number; item: T } >;
 
 type AddItemMeta< T > = {
 	type: 'add';
-	payload: ItemsActionPayload< T >;
+	payload: ItemActionPayload< T >;
 };
 
 type RemoveItemMeta< T > = {
@@ -54,7 +53,7 @@ type RemoveItemMeta< T > = {
 
 type DuplicateItemMeta< T > = {
 	type: 'duplicate';
-	payload: ItemsActionPayload< T >;
+	payload: ItemActionPayload< T >;
 };
 
 type ReorderItemMeta = {
@@ -153,7 +152,7 @@ export const Repeater = < T, >( {
 				return pos !== index;
 			} ),
 			{},
-			{ action: { type: 'remove', payload: { index, item: removedItem } } }
+			{ action: { type: 'remove', payload: [ { index, item: removedItem } ] } }
 		);
 	};
 
