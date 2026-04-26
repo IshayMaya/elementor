@@ -21,6 +21,9 @@ use Elementor\Modules\AtomicWidgets\Elements\Atomic_Tabs\Atomic_Tabs\Atomic_Tabs
 use Elementor\Modules\AtomicWidgets\Elements\Atomic_Tabs\Atomic_Tabs_Menu\Atomic_Tabs_Menu;
 use Elementor\Modules\AtomicWidgets\Elements\Atomic_Tabs\Atomic_Tab\Atomic_Tab;
 use Elementor\Modules\AtomicWidgets\Elements\Atomic_Tabs\Atomic_Tabs_Content_Area\Atomic_Tabs_Content_Area;
+use Elementor\Modules\AtomicWidgets\Elements\Collection_Loop\Collection_Loop;
+use Elementor\Modules\AtomicWidgets\Elements\Collection_Loop\Layout_Container;
+use Elementor\Modules\AtomicWidgets\Elements\Collection_Loop\Repeatable_Item;
 use Elementor\Modules\AtomicWidgets\ImportExport\Atomic_Import_Export;
 use Elementor\Modules\AtomicWidgets\Elements\Loader\Frontend_Assets_Loader;
 use Elementor\Modules\AtomicWidgets\PropsResolver\Transformers\Combine_Array_Transformer;
@@ -177,6 +180,7 @@ class Module extends BaseModule {
 		add_action( 'elementor/atomic-widgets/import/transformers/register', fn ( $transformers ) => $this->register_import_transformers( $transformers ) );
 		add_action( 'elementor/atomic-widgets/export/transformers/register', fn ( $transformers ) => $this->register_export_transformers( $transformers ) );
 		add_action( 'elementor/editor/templates/panel/category', fn () => $this->render_panel_category_chip() );
+		add_action( 'elementor/ajax/register_actions', fn ( $ajax ) => $ajax->register_ajax_action( 'render_atomic_element', [ $this, 'ajax_render_atomic_element' ] ) );
 	}
 
 	public static function get_experimental_data() {
@@ -301,6 +305,10 @@ class Module extends BaseModule {
 		$elements_manager->register_element_type( new Atomic_Tab() );
 		$elements_manager->register_element_type( new Atomic_Tabs_Content_Area() );
 		$elements_manager->register_element_type( new Atomic_Tab_Content() );
+
+		$elements_manager->register_element_type( new Collection_Loop() );
+		$elements_manager->register_element_type( new Layout_Container() );
+		$elements_manager->register_element_type( new Repeatable_Item() );
 
 		if ( \Elementor\Utils::has_pro() && Plugin::$instance->experiments->is_feature_active( 'e_pro_atomic_form' ) ) {
 			$elements_manager->register_element_type( new Atomic_Form() );
@@ -488,5 +496,41 @@ class Module extends BaseModule {
 			[ 'elementor-atomic-widgets-promotion-fonts' ],
 			ELEMENTOR_VERSION
 		);
+	}
+
+	public function ajax_render_atomic_element( $request ) {
+		$document = Plugin::$instance->documents->get_with_permissions( $request['editor_post_id'] );
+
+		query_posts( [
+			'p' => $request['editor_post_id'],
+			'post_type' => 'any',
+		] );
+
+		$editor = Plugin::$instance->editor;
+		$is_edit_mode = $editor->is_edit_mode();
+		$editor->set_edit_mode( true );
+
+		Plugin::$instance->documents->switch_to_document( $document );
+
+		ob_start();
+
+		$element = Plugin::$instance->elements_manager->create_element_instance( $request['data'] );
+
+		if ( ! $element ) {
+			ob_end_clean();
+			$editor->set_edit_mode( $is_edit_mode );
+
+			throw new \Exception( 'Element not found.' );
+		}
+
+		$element->print_element();
+
+		$render_html = ob_get_clean();
+
+		$editor->set_edit_mode( $is_edit_mode );
+
+		return [
+			'render' => $render_html,
+		];
 	}
 }

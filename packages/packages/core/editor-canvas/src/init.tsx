@@ -9,6 +9,7 @@ import { initFormAncestorEnforcement } from './form-structure/enforce-form-ances
 import { initFormNestingPrevention } from './form-structure/prevent-form-nesting-commands';
 import { initSettingsTransformers } from './init-settings-transformers';
 import { initStyleTransformers } from './init-style-transformers';
+import { initCollectionLoopType } from './legacy/collection-loop-type';
 import { initLegacyViews } from './legacy/init-legacy-views';
 import { initViewReplacements } from './legacy/replacements/manager';
 import { initTabsModelExtensions } from './legacy/tabs-model-extensions';
@@ -58,4 +59,5 @@ export function init() {
 	);
 
 	initTabsModelExtensions();
+	initCollectionLoopType();
 }

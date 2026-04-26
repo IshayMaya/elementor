@@ -16,7 +16,7 @@ import {
 import { __ } from '@wordpress/i18n';
 
 import { type SetValueMeta } from '../../bound-prop-context';
-import { ControlAdornments } from '../../control-adornments/control-adornments';
+// import { ControlAdornments } from '../../control-adornments/control-adornments';
 import { RepeaterItemIconSlot, RepeaterItemLabelSlot } from '../control-repeater/locations';
 import { SectionContent } from '../section-content';
 import { RepeaterHeader } from './repeater-header';
@@ -232,7 +232,7 @@ export const Repeater = < T, >( {
 
 	return (
 		<SectionContent gap={ 2 }>
-			<RepeaterHeader label={ label } adornment={ ControlAdornments }>
+			<RepeaterHeader label={ label }>
 				{ shouldShowInfotip ? (
 					<Infotip
 						placement="right"
@@ -262,14 +262,14 @@ export const Repeater = < T, >( {
 									disabled={ disabled }
 									propDisabled={ value?.disabled }
 									label={
-										<RepeaterItemLabelSlot value={ value }>
-											<itemSettings.Label value={ value } index={ index } />
-										</RepeaterItemLabelSlot>
+										// <RepeaterItemLabelSlot value={ value }>
+										<itemSettings.Label value={ value } index={ index } />
+										// </RepeaterItemLabelSlot>
 									}
 									startIcon={
-										<RepeaterItemIconSlot value={ value }>
-											<itemSettings.Icon value={ value } />
-										</RepeaterItemIconSlot>
+										// <RepeaterItemIconSlot value={ value }>
+										<itemSettings.Icon value={ value } />
+										// </RepeaterItemIconSlot>
 									}
 									removeItem={ () => removeRepeaterItem( index ) }
 									duplicateItem={ () => duplicateRepeaterItem( index ) }

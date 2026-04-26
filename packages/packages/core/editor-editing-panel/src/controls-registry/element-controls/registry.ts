@@ -1,9 +1,11 @@
 import { type ControlComponent } from '@elementor/editor-controls';
 
 import { type ControlRegistry, controlsRegistry } from '../controls-registry';
+import { AlternateItemsControl } from './alternate-items-control/alternate-items-control';
 import { TabsControl } from './tabs-control/tabs-control';
 
 const controlTypes = {
+	'alternate-items': { component: AlternateItemsControl as ControlComponent, layout: 'full' },
 	tabs: { component: TabsControl as ControlComponent, layout: 'full' },
 } as const satisfies ControlRegistry;
 

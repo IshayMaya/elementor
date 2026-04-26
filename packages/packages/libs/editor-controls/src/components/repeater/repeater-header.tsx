@@ -8,8 +8,7 @@ export const RepeaterHeader = forwardRef(
 	(
 		{
 			label,
-			children,
-			adornment: Adornment = ControlAdornments,
+			children, // adornment: Adornment = ControlAdornments,
 		}: React.PropsWithChildren< {
 			label: string;
 			adornment?: React.FC;
@@ -28,7 +27,7 @@ export const RepeaterHeader = forwardRef(
 					<Typography component="label" variant="caption" color="text.secondary" sx={ { lineHeight: 1 } }>
 						{ label }
 					</Typography>
-					<Adornment />
+					{ /* <Adornment /> */ }
 				</Box>
 				{ children }
 			</Stack>
