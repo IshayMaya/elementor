@@ -4,6 +4,7 @@ import { getMCPByDomain } from '@elementor/editor-mcp';
 import { ClassesRename } from './components/classes-rename';
 import { ElementsOverlays } from './components/elements-overlays';
 import { InteractionsRenderer } from './components/interactions-renderer';
+import { LoopEditOverlay } from './components/loop-edit-overlay/loop-edit-overlay';
 import { StyleRenderer } from './components/style-renderer';
 import { initFormAncestorEnforcement } from './form-structure/enforce-form-ancestor-commands';
 import { initFormNestingPrevention } from './form-structure/prevent-form-nesting-commands';
@@ -35,6 +36,11 @@ export function init() {
 	injectIntoTop( {
 		id: 'elements-overlays',
 		component: ElementsOverlays,
+	} );
+
+	injectIntoTop( {
+		id: 'loop-edit-overlay',
+		component: LoopEditOverlay,
 	} );
 
 	injectIntoTop( {

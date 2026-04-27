@@ -3,12 +3,16 @@ import {
 	createNestedTemplatedElementView,
 } from './create-nested-templated-element-type';
 import { registerElementType } from './init-legacy-views';
+import { getLoopEditingId, setLoopEditingId, subscribeLoopEditingId } from './loop-edit-mode/state';
+import { applyNavigatorFilter, clearNavigatorFilter } from './loop-edit-mode/structure-panel-filter';
 import { waitForChildrenToComplete } from './twig-rendering-utils';
 import { type ElementType, type ElementView, type LegacyWindow } from './types';
 
 const LAYOUT_TYPE = 'e-collection-loop-layout';
 const ITEM_TYPE = 'e-collection-loop-item';
 const STATIC_ITEM_CLASS = 'e-loop-static-item';
+const EDIT_LABEL_CLASS = 'e-loop-edit-label';
+const EDITING_CLASS = 'e-loop-editing';
 
 type AjaxWindow = Window & {
 	elementorCommon: {
@@ -24,6 +28,10 @@ type MarionetteExtendable = typeof ElementView & {
 
 function getCollectionLoopParentModel( view: ElementView ) {
 	return view._parent?.model;
+}
+
+function getLoopId( view: ElementView ): string | undefined {
+	return getCollectionLoopParentModel( view )?.get( 'id' ) as string | undefined;
 }
 
 let fetchIdCounter = 0;
@@ -106,6 +114,38 @@ function appendStaticItems( view: ElementView, fullHtml: string ) {
 	} );
 }
 
+function applyEditModeToView( view: ElementView ) {
+	const el = view.$el.get( 0 );
+	if ( ! el ) {
+		return;
+	}
+
+	el.querySelectorAll( `.${ STATIC_ITEM_CLASS }` ).forEach( ( node ) => node.remove() );
+	el.querySelectorAll( `.${ EDIT_LABEL_CLASS }` ).forEach( ( node ) => node.remove() );
+	el.classList.add( EDITING_CLASS );
+}
+
+function exitEditModeOnView( view: ElementView ) {
+	const el = view.$el.get( 0 );
+	if ( ! el ) {
+		return;
+	}
+
+	el.querySelectorAll( `.${ EDIT_LABEL_CLASS }` ).forEach( ( node ) => node.remove() );
+	el.classList.remove( EDITING_CLASS );
+}
+
+type LoopLayoutViewInstance = ElementView & {
+	_parentSettingsListener: ( () => void ) | null;
+	_renderGeneration: number;
+	_editModeUnsubscribe: ( () => void ) | null;
+	_wasInEditMode: boolean;
+	_listenToParentSettings: () => void;
+	_stopListeningToParentSettings: () => void;
+	_refetchStaticItems: () => void;
+	_onEditModeChanged: () => void;
+};
+
 function createCollectionLoopLayoutType( options: CreateNestedTemplatedElementTypeOptions ): typeof ElementType {
 	const legacyWindow = window as unknown as LegacyWindow;
 	const { type, renderer, element } = options;
@@ -116,10 +156,28 @@ function createCollectionLoopLayoutType( options: CreateNestedTemplatedElementTy
 	const LoopLayoutView = BaseView.extend( {
 		_parentSettingsListener: null as ( () => void ) | null,
 		_renderGeneration: 0 as number,
+		_editModeUnsubscribe: null as ( () => void ) | null,
+		_wasInEditMode: false as boolean,
 
-		async _renderChildren(
-			this: ElementView & { _parentSettingsListener: ( () => void ) | null; _renderGeneration: number }
-		) {
+		events() {
+			const proto = BaseView.prototype as unknown as { events?: () => Record< string, unknown > };
+			const parentEvents = typeof proto.events === 'function' ? proto.events.call( this ) : {};
+
+			return {
+				...parentEvents,
+				dblclick: '_handleDblClick',
+			};
+		},
+
+		_handleDblClick( this: LoopLayoutViewInstance, e: MouseEvent ) {
+			e.stopPropagation();
+			const loopId = getLoopId( this );
+			if ( loopId ) {
+				setLoopEditingId( loopId );
+			}
+		},
+
+		async _renderChildren( this: LoopLayoutViewInstance ) {
 			const generation = ++this._renderGeneration;
 
 			baseRenderChildren.call( this );
@@ -130,12 +188,19 @@ function createCollectionLoopLayoutType( options: CreateNestedTemplatedElementTy
 				return;
 			}
 
+			const loopId = getLoopId( this );
+			if ( loopId && getLoopEditingId() === loopId ) {
+				applyEditModeToView( this );
+				return;
+			}
+
 			const collectionLoopModel = getCollectionLoopParentModel( this );
 			if ( ! collectionLoopModel ) {
 				return;
 			}
 
 			const html = await fetchRenderedLoop( collectionLoopModel );
+
 			if ( ! html || generation !== this._renderGeneration ) {
 				return;
 			}
@@ -143,21 +208,51 @@ function createCollectionLoopLayoutType( options: CreateNestedTemplatedElementTy
 			appendStaticItems( this, html );
 		},
 
-		onRender( this: ElementView & { _listenToParentSettings: () => void } ) {
+		onRender( this: LoopLayoutViewInstance ) {
 			this._listenToParentSettings();
-		},
 
-		onDestroy( this: ElementView & { _stopListeningToParentSettings: () => void } ) {
-			this._stopListeningToParentSettings();
-		},
-
-		_listenToParentSettings(
-			this: ElementView & {
-				_parentSettingsListener: ( () => void ) | null;
-				_stopListeningToParentSettings: () => void;
-				_refetchStaticItems: () => void;
+			if ( this._editModeUnsubscribe ) {
+				this._editModeUnsubscribe();
 			}
-		) {
+
+			this._editModeUnsubscribe = subscribeLoopEditingId( () => this._onEditModeChanged() );
+		},
+
+		onDestroy( this: LoopLayoutViewInstance ) {
+			this._stopListeningToParentSettings();
+
+			if ( this._editModeUnsubscribe ) {
+				this._editModeUnsubscribe();
+				this._editModeUnsubscribe = null;
+			}
+
+			const loopId = getLoopId( this );
+			if ( loopId && getLoopEditingId() === loopId ) {
+				setLoopEditingId( null );
+			}
+		},
+
+		_onEditModeChanged( this: LoopLayoutViewInstance ) {
+			const loopId = getLoopId( this );
+			if ( ! loopId ) {
+				return;
+			}
+
+			const isNowEditing = getLoopEditingId() === loopId;
+
+			if ( isNowEditing && ! this._wasInEditMode ) {
+				this._wasInEditMode = true;
+				applyEditModeToView( this );
+				applyNavigatorFilter( loopId );
+			} else if ( ! isNowEditing && this._wasInEditMode ) {
+				this._wasInEditMode = false;
+				exitEditModeOnView( this );
+				clearNavigatorFilter();
+				this._refetchStaticItems();
+			}
+		},
+
+		_listenToParentSettings( this: LoopLayoutViewInstance ) {
 			this._stopListeningToParentSettings();
 
 			const collectionLoopModel = getCollectionLoopParentModel( this );
@@ -170,23 +265,36 @@ function createCollectionLoopLayoutType( options: CreateNestedTemplatedElementTy
 				return;
 			}
 
-			const handler = () => this._refetchStaticItems();
+			const handler = () => {
+				this._refetchStaticItems();
+			};
 
-			( settings as unknown as { on: ( event: string, cb: () => void ) => void } ).on( 'change', handler );
+			( settings as unknown as { on: ( event: string, cb: ( ...a: unknown[] ) => void ) => void } ).on(
+				'change',
+				handler
+			);
 
 			this._parentSettingsListener = () => {
-				( settings as unknown as { off: ( event: string, cb: () => void ) => void } ).off( 'change', handler );
+				( settings as unknown as { off: ( event: string, cb: ( ...a: unknown[] ) => void ) => void } ).off(
+					'change',
+					handler
+				);
 			};
 		},
 
-		_stopListeningToParentSettings( this: ElementView & { _parentSettingsListener: ( () => void ) | null } ) {
+		_stopListeningToParentSettings( this: LoopLayoutViewInstance ) {
 			if ( this._parentSettingsListener ) {
 				this._parentSettingsListener();
 				this._parentSettingsListener = null;
 			}
 		},
 
-		async _refetchStaticItems( this: ElementView & { _renderGeneration: number } ) {
+		async _refetchStaticItems( this: LoopLayoutViewInstance ) {
+			const loopId = getLoopId( this );
+			if ( loopId && getLoopEditingId() === loopId ) {
+				return;
+			}
+
 			const generation = ++this._renderGeneration;
 
 			const collectionLoopModel = getCollectionLoopParentModel( this );
@@ -195,6 +303,7 @@ function createCollectionLoopLayoutType( options: CreateNestedTemplatedElementTy
 			}
 
 			const html = await fetchRenderedLoop( collectionLoopModel );
+
 			if ( ! html || generation !== this._renderGeneration ) {
 				return;
 			}
