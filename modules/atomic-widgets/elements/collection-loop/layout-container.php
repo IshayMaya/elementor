@@ -82,8 +82,8 @@ class Layout_Container extends Atomic_Element_Base {
 			static::BASE_STYLE_KEY => Style_Definition::make()
 				->add_variant(
 					Style_Variant::make()
-						->add_prop( 'display', String_Prop_Type::generate( 'flex' ) )
-						->add_prop( 'flex-wrap', String_Prop_Type::generate( 'wrap' ) )
+						->add_prop( 'display', String_Prop_Type::generate( 'grid' ) )
+						->add_prop( 'grid-template-columns', String_Prop_Type::generate( 'repeat(3, 1fr)' ) )
 						->add_prop( 'gap', Size_Prop_Type::generate( [
 							'size' => 20,
 							'unit' => 'px',

@@ -51,28 +51,18 @@ function fetchRenderedLoop( parentModel: ElementView[ 'model' ] ): Promise< stri
 	} );
 }
 
-function getEditablePositions( view: ElementView ): Map< number, string > {
-	const positions = new Map< number, string >();
+function getEditableItems( el: HTMLElement ): HTMLElement[] {
+	return Array.from(
+		el.querySelectorAll< HTMLElement >(
+			`:scope > [data-element_type="${ ITEM_TYPE }"]:not(.${ STATIC_ITEM_CLASS })`
+		)
+	);
+}
 
-	const children = ( view.collection?.models ?? [] ) as Array< { get: ( k: string ) => unknown } >;
-
-	if ( children.length > 0 ) {
-		positions.set( 0, String( children[ 0 ].get( 'id' ) ) );
-	}
-
-	for ( let i = 1; i < children.length; i++ ) {
-		const child = children[ i ];
-		const settings = child.get( 'settings' ) as { get: ( key: string ) => unknown } | undefined;
-
-		const altIndexProp = settings?.get( 'alternate_index' ) as { value?: number } | number | null | undefined;
-		const position = typeof altIndexProp === 'object' && altIndexProp !== null ? altIndexProp.value : altIndexProp;
-
-		if ( typeof position === 'number' && position >= 1 ) {
-			positions.set( position - 1, String( child.get( 'id' ) ) );
-		}
-	}
-
-	return positions;
+function setEditableItemsHidden( el: HTMLElement, hidden: boolean ) {
+	getEditableItems( el ).forEach( ( item ) => {
+		item.style.display = hidden ? 'none' : '';
+	} );
 }
 
 function appendStaticItems( view: ElementView, fullHtml: string ) {
@@ -92,26 +82,15 @@ function appendStaticItems( view: ElementView, fullHtml: string ) {
 	}
 
 	const allItems = Array.from( layoutEl.querySelectorAll( `:scope > [data-element_type="${ ITEM_TYPE }"]` ) );
-	const editablePositions = getEditablePositions( view );
 
-	allItems.forEach( ( item, iterationIndex ) => {
-		const editableId = editablePositions.get( iterationIndex );
-
-		if ( editableId ) {
-			const editableEl = el.querySelector(
-				`:scope > [data-element_type="${ ITEM_TYPE }"][data-id="${ editableId }"]`
-			);
-			if ( editableEl ) {
-				el.appendChild( editableEl );
-			}
-			return;
-		}
-
+	allItems.forEach( ( item ) => {
 		item.classList.add( STATIC_ITEM_CLASS );
 		( item as HTMLElement ).style.pointerEvents = 'none';
 		( item as HTMLElement ).style.opacity = '0.7';
 		el.appendChild( item );
 	} );
+
+	setEditableItemsHidden( el, true );
 }
 
 function applyEditModeToView( view: ElementView ) {
@@ -122,6 +101,7 @@ function applyEditModeToView( view: ElementView ) {
 
 	el.querySelectorAll( `.${ STATIC_ITEM_CLASS }` ).forEach( ( node ) => node.remove() );
 	el.querySelectorAll( `.${ EDIT_LABEL_CLASS }` ).forEach( ( node ) => node.remove() );
+	setEditableItemsHidden( el, false );
 	el.classList.add( EDITING_CLASS );
 }
 
