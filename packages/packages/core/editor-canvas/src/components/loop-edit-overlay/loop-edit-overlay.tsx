@@ -3,48 +3,58 @@ import { type CSSProperties, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { __ } from '@wordpress/i18n';
 
-import { setLoopEditingId, useLoopEditingId } from '../../legacy/loop-edit-mode/state';
+import { setLoopEditingId, useLoopEditState } from '../../legacy/loop-edit-mode/state';
+import { LoopEditSwitcher } from './loop-edit-switcher';
 import { useCanvasDocument } from './use-canvas-document';
 import { useElementRect } from './use-element-rect';
 
 export function LoopEditOverlay() {
-	const loopId = useLoopEditingId();
+	const editState = useLoopEditState();
 	const canvasDocument = useCanvasDocument();
-	const loopElement = useLoopElement( canvasDocument, loopId );
+	const activeElement = useActiveItemElement( canvasDocument, editState?.activeItemId ?? null );
 
-	useEscapeKey( canvasDocument );
+	useEscapeKey( canvasDocument, editState?.loopId ?? null );
 
-	if ( ! loopId || ! canvasDocument?.body ) {
+	if ( ! editState || ! canvasDocument?.body ) {
 		return null;
 	}
 
-	return createPortal( <Backdrop canvas={ canvasDocument } element={ loopElement } />, canvasDocument.body );
+	return createPortal(
+		<>
+			<Backdrop canvas={ canvasDocument } element={ activeElement } />
+			<SwitcherToolbar
+				canvas={ canvasDocument }
+				element={ activeElement }
+				loopId={ editState.loopId }
+				activeItemId={ editState.activeItemId }
+			/>
+		</>,
+		canvasDocument.body
+	);
 }
 
-function useLoopElement( canvasDocument: Document | null, loopId: string | null ): HTMLElement | null {
+function useActiveItemElement( canvasDocument: Document | null, activeItemId: string | null ): HTMLElement | null {
 	const [ element, setElement ] = useState< HTMLElement | null >( null );
 
 	useEffect( () => {
-		if ( ! canvasDocument || ! loopId ) {
+		if ( ! canvasDocument || ! activeItemId ) {
 			setElement( null );
 			return;
 		}
 
-		const find = () => canvasDocument.querySelector< HTMLElement >( `[data-id="${ loopId }"]` );
+		const find = () => canvasDocument.querySelector< HTMLElement >( `[data-id="${ activeItemId }"]` );
 		setElement( find() );
 
 		const observer = new MutationObserver( () => setElement( find() ) );
 		observer.observe( canvasDocument.body, { childList: true, subtree: true } );
 
 		return () => observer.disconnect();
-	}, [ canvasDocument, loopId ] );
+	}, [ canvasDocument, activeItemId ] );
 
 	return element;
 }
 
-function useEscapeKey( canvasDocument: Document | null ) {
-	const loopId = useLoopEditingId();
-
+function useEscapeKey( canvasDocument: Document | null, loopId: string | null ) {
 	useEffect( () => {
 		if ( ! canvasDocument || ! loopId ) {
 			return;
@@ -99,6 +109,44 @@ function Backdrop( { canvas, element }: { canvas: Document; element: HTMLElement
 			tabIndex={ 0 }
 			aria-label={ __( 'Exit loop editing mode', 'elementor' ) }
 		/>
+	);
+}
+
+interface SwitcherToolbarProps {
+	canvas: Document;
+	element: HTMLElement | null;
+	loopId: string;
+	activeItemId: string;
+}
+
+function SwitcherToolbar( { canvas, element, loopId, activeItemId }: SwitcherToolbarProps ) {
+	const rect = useElementRect( element );
+	const viewport = canvas.defaultView as Window;
+
+	if ( ! element || ! viewport ) {
+		return null;
+	}
+
+	const toolbarStyle: CSSProperties = {
+		position: 'fixed',
+		left: rect.x,
+		top: Math.max( 0, rect.y - 36 ),
+		zIndex: 1000,
+		display: 'flex',
+		alignItems: 'center',
+		gap: '8px',
+		background: '#fff',
+		borderRadius: '4px',
+		padding: '4px 8px',
+		boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+		fontSize: '12px',
+		fontFamily: 'Arial, sans-serif',
+	};
+
+	return (
+		<div style={ toolbarStyle }>
+			<LoopEditSwitcher loopId={ loopId } activeItemId={ activeItemId } />
+		</div>
 	);
 }
 
